@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>TMS - Gestão de Transporte</title>
+    <!-- Leaflet, routing, jsPDF -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, 'Segoe UI', Roboto, sans-serif; }
+        body { background: #eef2f5; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 32px; padding: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
+        h1 { font-size: 1.8rem; color: #1a73e8; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        .sub { color: #5f6368; border-left: 4px solid #1a73e8; padding-left: 12px; margin-bottom: 20px; font-size: 0.9rem; }
+        .tabs { display: flex; gap: 10px; border-bottom: 1px solid #ddd; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { padding: 8px 18px; border-radius: 40px; background: #f1f3f4; cursor: pointer; font-weight: 500; transition: 0.2s; }
+        .tab.active { background: #1a73e8; color: white; }
+        .row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+        .row > div { flex: 1; min-width: 150px; }
+        label { font-weight: 600; display: block; margin: 12px 0 6px; font-size: 0.85rem; color: #202124; }
+        input, textarea, select { width: 100%; padding: 10px 12px; border: 1px solid #dadce0; border-radius: 16px; font-size: 0.9rem; }
+        input:focus, textarea:focus, select:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+        .btn { padding: 8px 16px; border: none; border-radius: 40px; font-weight: 600; cursor: pointer; background: #f1f3f4; color: #1a73e8; transition: 0.2s; display: inline-block; text-align: center; }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-outline { border: 1.5px solid #1a73e8; background: white; }
+        .btn-outline:hover { background: #e8f0fe; }
+        .btn-secondary { background: #34a853; color: white; }
+        .btn-secondary:hover { background: #2c8e47; }
+        .btn-danger { background: #ea4335; color: white; }
+        .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+        .card { background: #f8f9fa; border-radius: 20px; padding: 16px; margin-top: 20px; }
+        .info-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e0e0e0; font-weight: 500; }
+        .info-item.total { font-size: 1.1rem; font-weight: bold; border-bottom: none; }
+        #map { height: 350px; width: 100%; border-radius: 20px; margin-top: 16px; background: #ccc; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #323232; color: white; padding: 8px 16px; border-radius: 40px; font-size: 0.8rem; opacity: 0; transition: 0.2s; pointer-events: none; z-index: 999; }
+        .flex-buttons { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; border-radius: 28px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .close-modal { float: right; cursor: pointer; font-size: 1.5rem; }
+        .motorista-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
+        .help-button { position: fixed; bottom: 20px; right: 20px; background: #1a73e8; color: white; width: 56px; height: 56px; border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: 0.2s; z-index: 1100; border: none; }
+        .help-button:hover { background: #1557b0; transform: scale(1.05); }
+        .help-content h3 { margin-top: 16px; color: #1a73e8; }
+        .help-content p, .help-content li { font-size: 0.9rem; line-height: 1.4; }
+        .help-content ul { padding-left: 20px; margin: 8px 0; }
+        .nav-btn { background: #34a853; margin-left: 10px; }
+        @media (max-width: 700px) { .row { flex-direction: column; gap: 0; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📦 TMS Transportadora 
+        <button class="btn nav-btn" id="btnIrAnalisador">📊 Ir para Analisador de Viagens</button>
+    </h1>
+    <div class="sub">Gestão de viagens, motoristas, custos, lucro, mapa e romaneio PDF</div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="viagem">🚚 Viagem</div>
+        <div class="tab" data-tab="perfil">👥 Perfis</div>
+        <div class="tab" data-tab="motoristas">👨‍✈️ Motoristas</div>
+        <div class="tab" data-tab="historico">📋 Histórico</div>
+    </div>
+
+    <!-- ABA VIAGEM -->
+    <div id="tabViagem">
+        <div class="row">
+            <div><label>📍 Origem *</label><input type="text" id="origem" placeholder="Endereço de partida"></div>
+            <div><label>🏁 Destino *</label><input type="text" id="destino" placeholder="Endereço de chegada"></div>
+        </div>
+        <div class="row">
+            <div><label>📏 KM Rodado</label><input type="text" id="kmRodado" readonly placeholder="-- km"></div>
+            <div><label>⏱️ Tempo Estimado</label><input type="text" id="tempoEstimado" readonly placeholder="--"></div>
+        </div>
+        <div class="flex-buttons">
+            <button class="btn btn-outline btn-sm" id="calcularRotaBtn">🔄 Calcular Rota</button>
+            <button class="btn btn-outline btn-sm" id="abrirMapsBtn">🗺️ Abrir Rota no Google Maps</button>
+        </div>
+        <div id="map"></div>
+
+        <label>🛒 Mercadoria</label><input type="text" id="mercadoria" placeholder="Ex: Cimento 50kg">
+        <div class="row">
+            <div><label>👨‍✈️ Motorista</label>
+                <input type="text" id="motorista" placeholder="Nome" list="motoristaList">
+                <datalist id="motoristaList"></datalist>
+            </div>
+            <div><label>🚛 Placa</label><input type="text" id="placa" placeholder="ABC-1234"></div>
+        </div>
+        <div class="row">
+            <div><label>💰 Valor da Carga (R$)</label><input type="text" id="valorCarga" inputmode="decimal"></div>
+            <div><label>⚖️ Peso (KG)</label><input type="text" id="pesoCarga" inputmode="decimal"></div>
+            <div><label>💵 Valor do Frete (R$)</label><input type="text" id="valorFrete" inputmode="decimal"></div>
+        </div>
+        <label>💰 Custos (R$) – preencha apenas o que a transportadora paga</label>
+        <div class="row">
+            <div><input type="text" id="custoMotorista" placeholder="Motorista" inputmode="decimal"></div>
+            <div><input type="text" id="custoCombustivel" placeholder="Combustível" inputmode="decimal"></div>
+            <div><input type="text" id="custoPedagio" placeholder="Pedágio" inputmode="decimal"></div>
+            <div><input type="text" id="custoOutros" placeholder="Outros" inputmode="decimal"></div>
+        </div>
+        <label>📝 Observação</label><textarea id="observacao" rows="2"></textarea>
+
+        <div class="card">
+            <div class="info-item"><span>🚗 KM</span><span id="resKm">0</span></div>
+            <div class="info-item"><span>⏱️ Tempo</span><span id="resTempo">0h 00min</span></div>
+            <div class="info-item"><span>🧑‍✈️ Custo Motorista</span><span id="resCustoMotorista">R$ 0,00</span></div>
+            <div class="info-item"><span>⛽ Custo Combustível</span><span id="resCustoCombustivel">R$ 0,00</span></div>
+            <div class="info-item"><span>🛣️ Custo Pedágio</span><span id="resCustoPedagio">R$ 0,00</span></div>
+            <div class="info-item"><span>📦 Outros Custos</span><span id="resCustoOutros">R$ 0,00</span></div>
+            <div class="info-item total"><span>💰 Custo Total (Transportadora)</span><span id="resTotal">R$ 0,00</span></div>
+            <div class="info-item total" id="lucroLinha"><span>💵 Lucro da Transportadora</span><span id="resLucro">R$ 0,00</span></div>
+        </div>
+        <div class="flex-buttons">
+            <button class="btn btn-primary" id="salvarViagemBtn">💾 Salvar Viagem</button>
+            <button class="btn btn-secondary" id="gerarPdfAtualBtn">📄 Gerar PDF desta viagem</button>
+        </div>
+    </div>
+
+    <!-- ABA PERFIL -->
+    <div id="tabPerfil" style="display:none;">
+        <div class="row" style="align-items: flex-end;">
+            <div><label>Perfil ativo</label><select id="perfilSelect"></select></div>
+            <div><button class="btn btn-outline btn-sm" id="novoPerfilBtn">+ Novo Perfil</button></div>
+            <div><button class="btn btn-danger btn-sm" id="excluirPerfilBtn">🗑️ Excluir Perfil</button></div>
+        </div>
+        <div class="card">
+            <div class="row">
+                <div><label>📐 Fórmula de lucro para este perfil:</label>
+                    <select id="formulaLucroSelect">
+                        <option value="transp">Lucro da Transportadora = Frete - Custo Motorista</option>
+                        <option value="liquido">Lucro Líquido = Frete - Custos Totais</option>
+                    </select>
+                </div>
+            </div>
+            <div class="info-item"><span>Exemplo:</span><span id="exemploFormula">Frete - Custo Motorista</span></div>
+            <p><strong>Perfil ativo:</strong> <span id="perfilAtivoNome"></span></p>
+            <p>Cada perfil pode ter sua própria regra de lucro. Ideal para diferentes contratos.</p>
+        </div>
+    </div>
+
+    <!-- ABA MOTORISTAS -->
+    <div id="tabMotoristas" style="display:none;">
+        <div class="flex-buttons">
+            <button class="btn btn-primary btn-sm" id="novoMotoristaBtn">➕ Cadastrar Motorista</button>
+        </div>
+        <div id="listaMotoristasCadastrados" class="card"></div>
+    </div>
+
+    <!-- ABA HISTÓRICO -->
+    <div id="tabHistorico" style="display:none;">
+        <div id="listaHistorico" class="card"></div>
+        <button class="btn btn-outline btn-sm" id="exportarHistoricoBtn">📁 Exportar Histórico (JSON)</button>
+    </div>
+</div>
+
+<!-- Modal motorista -->
+<div id="modalMotorista" class="modal">
+    <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <h3>Cadastrar Motorista</h3>
+        <label>Nome completo *</label><input type="text" id="motNome">
+        <label>CPF</label><input type="text" id="motCpf">
+        <label>CNH</label><input type="text" id="motCnh">
+        <label>Telefone</label><input type="text" id="motTelefone">
+        <label>Placa padrão</label><input type="text" id="motPlaca">
+        <label>Valor padrão (R$/viagem)</label><input type="text" id="motValor" inputmode="decimal">
+        <div class="flex-buttons" style="margin-top:16px;">
+            <button class="btn btn-primary" id="salvarMotoristaBtn">Salvar</button>
+            <button class="btn btn-outline" id="cancelarMotoristaBtn">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal ajuda -->
+<div id="modalAjuda" class="modal">
+    <div class="modal-content help-content">
+        <span class="close-modal" id="closeAjuda">&times;</span>
+        <h2 style="color:#1a73e8;">❓ Como usar o sistema</h2>
+        <h3>1. Perfis</h3>
+        <p>Crie perfis para diferentes clientes, frotas ou projetos. Cada perfil mantém seus próprios motoristas e viagens.</p>
+        <h3>2. Cadastrar Motoristas</h3>
+        <p>Na aba <strong>Motoristas</strong>, cadastre os dados dos caminhoneiros.</p>
+        <h3>3. Registrar uma Viagem</h3>
+        <p>Preencha <strong>Origem e Destino</strong>, clique em <strong>Calcular Rota</strong>, preencha custos e salve.</p>
+        <h3>4. Salvar e Gerar PDF</h3>
+        <p>Clique em <strong>Salvar Viagem</strong> e depois <strong>Gerar PDF</strong>.</p>
+        <h3>5. Histórico</h3>
+        <p>Exporte o JSON para usar no Analisador de Viagens.</p>
+        <p style="margin-top:16px; text-align:center;"><button class="btn btn-primary" id="fecharAjudaBtn">Entendi</button></p>
+    </div>
+</div>
+
+<div id="toastMsg" class="toast"></div>
+<button class="help-button" id="helpButton">❓</button>
+
+<script>
+    const { jsPDF } = window.jspdf;
+    let dados = {
+        perfis: { "Padrão": { viagens: [], motoristas: [], formulaLucro: "transp" } },
+        perfilAtual: "Padrão"
+    };
+    function carregarDados() {
+        const salvo = localStorage.getItem("tmsCompleto");
+        if (salvo) { dados = JSON.parse(salvo); for (let p in dados.perfis) if (!dados.perfis[p].formulaLucro) dados.perfis[p].formulaLucro = "transp"; }
+        else { dados.perfis["Padrão"].motoristas.push({ id: Date.now(), nome: "João Silva", cpf: "123.456.789-00", cnh: "SP123456", telefone: "(11) 98765-4321", placa: "BRA-2024", valorPadrao: "350,00" }); dados.perfis["Padrão"].formulaLucro = "transp"; salvarDados(); }
+        if (!dados.perfilAtual) dados.perfilAtual = "Padrão";
+        if (!dados.perfis[dados.perfilAtual]) dados.perfilAtual = "Padrão";
+        atualizarTudo();
+    }
+    function salvarDados() { localStorage.setItem("tmsCompleto", JSON.stringify(dados)); }
+    function mostrarToast(msg) { const toast = document.getElementById('toastMsg'); toast.textContent = msg; toast.style.opacity = '1'; setTimeout(() => toast.style.opacity = '0', 2500); }
+    // Perfis
+    function atualizarSelectPerfil() {
+        const select = document.getElementById("perfilSelect"); select.innerHTML = "";
+        Object.keys(dados.perfis).forEach(nome => { const opt = document.createElement("option"); opt.value = nome; opt.textContent = nome; if (nome === dados.perfilAtual) opt.selected = true; select.appendChild(opt); });
+        document.getElementById("perfilAtivoNome").innerText = dados.perfilAtual;
+        document.getElementById("formulaLucroSelect").value = dados.perfis[dados.perfilAtual].formulaLucro || "transp";
+        atualizarExemploFormula();
+    }
+    function atualizarExemploFormula() { const formula = dados.perfis[dados.perfilAtual].formulaLucro; document.getElementById("exemploFormula").innerText = formula === "transp" ? "Frete - Custo Motorista" : "Frete - Custos Totais"; calcularFinanceiro(); }
+    function trocarPerfil(nome) { if (dados.perfis[nome]) { dados.perfilAtual = nome; salvarDados(); atualizarTudo(); mostrarToast(`Perfil alterado para "${nome}"`); } }
+    function criarPerfil() { let nome = prompt("Nome do novo perfil:"); if (nome && !dados.perfis[nome]) { dados.perfis[nome] = { viagens: [], motoristas: [], formulaLucro: "transp" }; dados.perfilAtual = nome; salvarDados(); atualizarTudo(); mostrarToast(`Perfil "${nome}" criado`); } else if (nome) alert("Perfil já existe!"); }
+    function excluirPerfilAtual() { if (Object.keys(dados.perfis).length === 1) { alert("Deve ter pelo menos um perfil."); return; } if (confirm(`Excluir perfil "${dados.perfilAtual}"?`)) { delete dados.perfis[dados.perfilAtual]; dados.perfilAtual = Object.keys(dados.perfis)[0]; salvarDados(); atualizarTudo(); mostrarToast("Perfil removido"); } }
+    // Motoristas
+    function atualizarDatalistMotoristas() {
+        const motoristas = dados.perfis[dados.perfilAtual]?.motoristas || [];
+        document.getElementById("motoristaList").innerHTML = motoristas.map(m => `<option value="${m.nome}">`).join("");
+        const inputMotorista = document.getElementById("motorista");
+        inputMotorista.removeEventListener("change", preencherMotorista);
+        inputMotorista.addEventListener("change", preencherMotorista);
+    }
+    function preencherMotorista() { const nome = this.value; const motorista = dados.perfis[dados.perfilAtual].motoristas.find(m => m.nome === nome); if (motorista) { document.getElementById("placa").value = motorista.placa || ""; if (motorista.valorPadrao) { document.getElementById("custoMotorista").value = motorista.valorPadrao; calcularFinanceiro(); } } }
+    function renderizarListaMotoristas() {
+        const container = document.getElementById("listaMotoristasCadastrados"); const motoristas = dados.perfis[dados.perfilAtual]?.motoristas || [];
+        if (motoristas.length === 0) { container.innerHTML = "<p>Nenhum motorista cadastrado.</p>"; return; }
+        container.innerHTML = motoristas.map(m => `<div class="motorista-item"><div><strong>${m.nome}</strong><br>${m.cpf || '---'} | ${m.cnh || '---'}<br>${m.telefone || ''}</div><div><button class="btn btn-outline btn-sm editar-motorista" data-id="${m.id}">✏️</button><button class="btn btn-danger btn-sm excluir-motorista" data-id="${m.id}">🗑️</button></div></div>`).join("");
+        document.querySelectorAll(".editar-motorista").forEach(btn => btn.addEventListener("click", () => editarMotorista(parseInt(btn.dataset.id))));
+        document.querySelectorAll(".excluir-motorista").forEach(btn => btn.addEventListener("click", () => excluirMotorista(parseInt(btn.dataset.id))));
+    }
+    function abrirModalMotorista(motorista = null) { const modal = document.getElementById("modalMotorista"); document.getElementById("motNome").value = motorista ? motorista.nome : ""; document.getElementById("motCpf").value = motorista ? motorista.cpf : ""; document.getElementById("motCnh").value = motorista ? motorista.cnh : ""; document.getElementById("motTelefone").value = motorista ? motorista.telefone : ""; document.getElementById("motPlaca").value = motorista ? motorista.placa : ""; document.getElementById("motValor").value = motorista ? motorista.valorPadrao : ""; modal.dataset.editId = motorista ? motorista.id : ""; modal.style.display = "flex"; }
+    function fecharModalMotorista() { document.getElementById("modalMotorista").style.display = "none"; }
+    function salvarMotorista() { const nome = document.getElementById("motNome").value.trim(); if (!nome) { alert("Nome obrigatório"); return; } const motorista = { id: parseInt(document.getElementById("modalMotorista").dataset.editId) || Date.now(), nome, cpf: document.getElementById("motCpf").value, cnh: document.getElementById("motCnh").value, telefone: document.getElementById("motTelefone").value, placa: document.getElementById("motPlaca").value, valorPadrao: document.getElementById("motValor").value }; const motoristas = dados.perfis[dados.perfilAtual].motoristas; const idx = motoristas.findIndex(m => m.id === motorista.id); if (idx !== -1) motoristas[idx] = motorista; else motoristas.push(motorista); salvarDados(); fecharModalMotorista(); renderizarListaMotoristas(); atualizarDatalistMotoristas(); mostrarToast("Motorista salvo"); }
+    function excluirMotorista(id) { if (confirm("Remover motorista?")) { dados.perfis[dados.perfilAtual].motoristas = dados.perfis[dados.perfilAtual].motoristas.filter(m => m.id !== id); salvarDados(); renderizarListaMotoristas(); atualizarDatalistMotoristas(); mostrarToast("Motorista removido"); } }
+    function editarMotorista(id) { const motorista = dados.perfis[dados.perfilAtual].motoristas.find(m => m.id === id); if (motorista) abrirModalMotorista(motorista); }
+    // Mapa
+    let map, routingControl;
+    function initMap() { map = L.map('map').setView([-14.235, -51.925], 4); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map); }
+    async function calcularRota() { const origem = document.getElementById('origem').value.trim(); const destino = document.getElementById('destino').value.trim(); if (!origem || !destino) { mostrarToast("Preencha origem e destino."); return; } mostrarToast("Buscando rota..."); try { const geoUrl = (addr) => `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`; const [origRes, destRes] = await Promise.all([fetch(geoUrl(origem)).then(r => r.json()), fetch(geoUrl(destino)).then(r => r.json())]); if (!origRes.length || !destRes.length) throw new Error("Endereço não encontrado"); const start = [parseFloat(origRes[0].lat), parseFloat(origRes[0].lon)]; const end = [parseFloat(destRes[0].lat), parseFloat(destRes[0].lon)]; const routeUrl = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`; const routeRes = await fetch(routeUrl).then(r => r.json()); if (!routeRes.routes || !routeRes.routes.length) throw new Error("Rota não encontrada"); const route = routeRes.routes[0]; const distanciaKm = (route.distance / 1000).toFixed(1); const duracaoSeg = route.duration; const horas = Math.floor(duracaoSeg / 3600); const minutos = Math.floor((duracaoSeg % 3600) / 60); const duracaoTexto = `${horas}h ${minutos.toString().padStart(2,'0')}min`; document.getElementById('kmRodado').value = distanciaKm; document.getElementById('tempoEstimado').value = duracaoTexto; document.getElementById('resKm').innerText = distanciaKm; document.getElementById('resTempo').innerText = duracaoTexto; if (routingControl) map.removeControl(routingControl); routingControl = L.Routing.control({ waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])], router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }), lineOptions: { styles: [{ color: '#1a73e8', weight: 5 }] }, show: false, addWaypoints: false, draggableWaypoints: false }).addTo(map); map.fitBounds(routingControl.getWaypoints().map(wp => wp.latLng)); mostrarToast(`Rota: ${distanciaKm} km, ${duracaoTexto}`); } catch (err) { mostrarToast("Erro: " + err.message); } }
+    function abrirGoogleMaps() { const o = document.getElementById('origem').value.trim(); const d = document.getElementById('destino').value.trim(); if (!o || !d) { mostrarToast("Preencha origem e destino."); return; } window.open(`https://www.google.com/maps/dir/${encodeURIComponent(o)}/${encodeURIComponent(d)}`, '_blank'); }
+    // Financeiro
+    function parseMoney(val) { if (!val) return 0; let s = val.toString().replace(/\./g, '').replace(',', '.'); return parseFloat(s) || 0; }
+    function calcularFinanceiro() { const custoMotorista = parseMoney(document.getElementById('custoMotorista').value); const custoCombustivel = parseMoney(document.getElementById('custoCombustivel').value); const custoPedagio = parseMoney(document.getElementById('custoPedagio').value); const custoOutros = parseMoney(document.getElementById('custoOutros').value); const frete = parseMoney(document.getElementById('valorFrete').value); const totalCusto = custoMotorista + custoCombustivel + custoPedagio + custoOutros; const formula = dados.perfis[dados.perfilAtual]?.formulaLucro || "transp"; let lucro = formula === "transp" ? frete - custoMotorista : frete - totalCusto; document.getElementById('resCustoMotorista').innerHTML = `R$ ${custoMotorista.toFixed(2).replace('.',',')}`; document.getElementById('resCustoCombustivel').innerHTML = `R$ ${custoCombustivel.toFixed(2).replace('.',',')}`; document.getElementById('resCustoPedagio').innerHTML = `R$ ${custoPedagio.toFixed(2).replace('.',',')}`; document.getElementById('resCustoOutros').innerHTML = `R$ ${custoOutros.toFixed(2).replace('.',',')}`; document.getElementById('resTotal').innerHTML = `R$ ${totalCusto.toFixed(2).replace('.',',')}`; const lucroSpan = document.getElementById('resLucro'); lucroSpan.innerHTML = `R$ ${lucro.toFixed(2).replace('.',',')}`; lucroSpan.style.color = lucro >= 0 ? '#1e8e3e' : '#ea4335'; }
+    // Viagens
+    function getDadosViagem() { const custoMotorista = parseMoney(document.getElementById('custoMotorista').value); const custoCombustivel = parseMoney(document.getElementById('custoCombustivel').value); const custoPedagio = parseMoney(document.getElementById('custoPedagio').value); const custoOutros = parseMoney(document.getElementById('custoOutros').value); const totalCusto = custoMotorista + custoCombustivel + custoPedagio + custoOutros; const frete = parseMoney(document.getElementById('valorFrete').value); const formula = dados.perfis[dados.perfilAtual]?.formulaLucro || "transp"; const lucro = formula === "transp" ? frete - custoMotorista : frete - totalCusto; return { id: Date.now(), data: new Date().toLocaleString('pt-BR'), origem: document.getElementById('origem').value, destino: document.getElementById('destino').value, km: document.getElementById('kmRodado').value, tempo: document.getElementById('tempoEstimado').value, mercadoria: document.getElementById('mercadoria').value, motoristaNome: document.getElementById('motorista').value, placa: document.getElementById('placa').value, valorCarga: document.getElementById('valorCarga').value, peso: document.getElementById('pesoCarga').value, valorFrete: document.getElementById('valorFrete').value, custoMotorista, custoCombustivel, custoPedagio, custoOutros, custoTotal: totalCusto, lucro, formulaLucro: formula }; }
+    function salvarViagem() { const viagem = getDadosViagem(); if (!viagem.origem || !viagem.destino) { mostrarToast("Preencha origem e destino."); return; } dados.perfis[dados.perfilAtual].viagens.unshift(viagem); salvarDados(); mostrarToast("Viagem salva!"); ['mercadoria', 'valorCarga', 'pesoCarga', 'valorFrete', 'observacao', 'custoMotorista', 'custoCombustivel', 'custoPedagio', 'custoOutros'].forEach(id => document.getElementById(id).value = ''); calcularFinanceiro(); renderizarHistorico(); }
+    function gerarPDF(viagem) { if (!jsPDF) { alert("Erro ao gerar PDF."); return; } const doc = new jsPDF(); doc.setFontSize(20); doc.setTextColor(26,115,232); doc.text("ROMANEIO DE TRANSPORTE", 14, 22); doc.setFontSize(9); doc.setTextColor(100,100,100); doc.text(`Emissão: ${new Date().toLocaleString('pt-BR')}`, 14, 32); doc.line(14,36,200,36); let y=48; const left=14, right=110; const maxWidth=80; const addField = (label, value) => { doc.setFontSize(10); doc.setTextColor(0,0,0); doc.text(label+":", left, y); const lines = doc.splitTextToSize(value || "-", maxWidth); doc.text(lines, right, y); return y + (lines.length * 6); }; y = addField("Mercadoria", viagem.mercadoria); y = addField("Motorista / Placa", `${viagem.motoristaNome} - ${viagem.placa}`); y = addField("Rota (Origem → Destino)", `${viagem.origem} → ${viagem.destino}`); y = addField("Distância / Tempo", `${viagem.km} km - ${viagem.tempo}`); y = addField("Valor da Carga", `R$ ${(parseFloat(viagem.valorCarga)||0).toFixed(2).replace('.',',')}`); y = addField("Peso", `${viagem.peso || 0} kg`); y = addField("Valor do Frete", `R$ ${(parseFloat(viagem.valorFrete)||0).toFixed(2).replace('.',',')}`); y += 6; doc.setFontSize(11); doc.text("DETALHAMENTO DE CUSTOS", left, y); y += 6; doc.setFontSize(9); doc.text("Descrição", left, y); doc.text("Valor (R$)", right, y); y += 4; doc.line(left, y, right+40, y); y += 4; const custos = [["Motorista", viagem.custoMotorista], ["Combustível", viagem.custoCombustivel], ["Pedágio", viagem.custoPedagio], ["Outros", viagem.custoOutros]]; custos.forEach(([desc,val]) => { doc.text(desc, left, y); doc.text(`${val.toFixed(2).replace('.',',')}`, right, y); y += 5; }); doc.line(left, y, right+40, y); y += 4; doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.text("CUSTO TOTAL", left, y); doc.text(`${viagem.custoTotal.toFixed(2).replace('.',',')}`, right, y); y += 6; doc.text(`LUCRO (${viagem.formulaLucro === "transp" ? "Frete - Motorista" : "Líquido"})`, left, y); doc.setTextColor(viagem.lucro >= 0 ? 30 : 200, viagem.lucro >= 0 ? 150 : 70, 70); doc.text(`${viagem.lucro.toFixed(2).replace('.',',')}`, right, y); y += 10; doc.setFont(undefined, 'normal'); doc.setTextColor(0,0,0); doc.setFontSize(9); doc.text("Observações:", left, y); y += 4; const obsLines = doc.splitTextToSize(viagem.observacao || "Nenhuma", 160); doc.text(obsLines, left, y); doc.setFontSize(7); doc.setTextColor(150,150,150); doc.text("Sistema TMS - Gestão de Transporte", 14, 280); doc.save(`romaneio_${viagem.mercadoria || 'viagem'}_${viagem.id}.pdf`); mostrarToast("PDF gerado!"); }
+    function renderizarHistorico() { const viagens = dados.perfis[dados.perfilAtual]?.viagens || []; const container = document.getElementById("listaHistorico"); if (viagens.length === 0) { container.innerHTML = "<p>Nenhuma viagem salva neste perfil.</p>"; return; } container.innerHTML = viagens.map(v => `<div class="card" style="margin-bottom:12px;"><div class="info-item"><span>📅 ${v.data}</span><span>${v.mercadoria || '---'}</span></div><div class="info-item"><span>📍 ${v.origem} → ${v.destino}</span><span>${v.km} km / ${v.tempo}</span></div><div class="info-item"><span>💰 Custo Total</span><span>R$ ${v.custoTotal.toFixed(2).replace('.',',')}</span></div><div class="info-item"><span>💵 Lucro (${v.formulaLucro === "transp" ? "Frete - Motorista" : "Líquido"})</span><span style="color:${v.lucro>=0?'#1e8e3e':'#ea4335'}">R$ ${v.lucro.toFixed(2).replace('.',',')}</span></div><button class="btn btn-secondary btn-sm" onclick="window.gerarPDFHistorico(${v.id})">📄 Gerar PDF</button></div>`).join(''); }
+    window.gerarPDFHistorico = function(id) { const viagem = dados.perfis[dados.perfilAtual].viagens.find(v => v.id === id); if (viagem) gerarPDF(viagem); else mostrarToast("Viagem não encontrada."); };
+    function exportarHistoricoJSON() { const blob = new Blob([JSON.stringify(dados.perfis[dados.perfilAtual].viagens, null, 2)], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `historico_${dados.perfilAtual}.json`; a.click(); URL.revokeObjectURL(url); mostrarToast("Histórico exportado"); }
+    function abrirAjuda() { document.getElementById("modalAjuda").style.display = "flex"; }
+    function fecharAjuda() { document.getElementById("modalAjuda").style.display = "none"; }
+    function atualizarTudo() { atualizarSelectPerfil(); atualizarDatalistMotoristas(); renderizarListaMotoristas(); renderizarHistorico(); calcularFinanceiro(); }
+    function trocarAba(abaId) { document.querySelectorAll('[id^="tab"]').forEach(el => el.style.display = 'none'); document.getElementById(`tab${abaId.charAt(0).toUpperCase() + abaId.slice(1)}`).style.display = 'block'; document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); document.querySelector(`.tab[data-tab="${abaId}"]`).classList.add('active'); if (abaId === 'historico') renderizarHistorico(); if (abaId === 'motoristas') renderizarListaMotoristas(); if (abaId === 'perfil') atualizarSelectPerfil(); }
+    // Eventos
+    document.getElementById("calcularRotaBtn").addEventListener("click", calcularRota);
+    document.getElementById("abrirMapsBtn").addEventListener("click", abrirGoogleMaps);
+    document.getElementById("salvarViagemBtn").addEventListener("click", salvarViagem);
+    document.getElementById("gerarPdfAtualBtn").addEventListener("click", () => gerarPDF(getDadosViagem()));
+    document.getElementById("novoPerfilBtn").addEventListener("click", criarPerfil);
+    document.getElementById("excluirPerfilBtn").addEventListener("click", excluirPerfilAtual);
+    document.getElementById("perfilSelect").addEventListener("change", (e) => trocarPerfil(e.target.value));
+    document.getElementById("formulaLucroSelect").addEventListener("change", (e) => { dados.perfis[dados.perfilAtual].formulaLucro = e.target.value; salvarDados(); atualizarExemploFormula(); calcularFinanceiro(); mostrarToast("Fórmula de lucro atualizada"); });
+    document.getElementById("novoMotoristaBtn").addEventListener("click", () => abrirModalMotorista(null));
+    document.getElementById("salvarMotoristaBtn").addEventListener("click", salvarMotorista);
+    document.getElementById("cancelarMotoristaBtn").addEventListener("click", fecharModalMotorista);
+    document.querySelector("#modalMotorista .close-modal").addEventListener("click", fecharModalMotorista);
+    document.getElementById("exportarHistoricoBtn").addEventListener("click", exportarHistoricoJSON);
+    document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => trocarAba(tab.dataset.tab)));
+    ['custoMotorista', 'custoCombustivel', 'custoPedagio', 'custoOutros', 'valorFrete'].forEach(id => document.getElementById(id).addEventListener('input', calcularFinanceiro));
+    document.getElementById("helpButton").addEventListener("click", abrirAjuda);
+    document.getElementById("closeAjuda").addEventListener("click", fecharAjuda);
+    document.getElementById("fecharAjudaBtn").addEventListener("click", fecharAjuda);
+    window.addEventListener("click", (e) => { if (e.target === document.getElementById("modalAjuda")) fecharAjuda(); });
+    // Botão para ir ao analisador (abre nova aba)
+    document.getElementById("btnIrAnalisador").addEventListener("click", () => {
+        window.open("analisador-viagens.html", "_blank");
+    });
+    initMap();
+    carregarDados();
+    trocarAba('viagem');
+</script>
+</body>
+</html>
