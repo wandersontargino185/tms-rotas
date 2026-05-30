@@ -285,9 +285,9 @@
     document.getElementById("closeAjuda").addEventListener("click", fecharAjuda);
     document.getElementById("fecharAjudaBtn").addEventListener("click", fecharAjuda);
     window.addEventListener("click", (e) => { if (e.target === document.getElementById("modalAjuda")) fecharAjuda(); });
-    // Botão para ir ao analisador (abre nova aba)
+    // ✅ Botão "Ir para Analisador de Viagens" agora aponta para o GitHub Pages correto
     document.getElementById("btnIrAnalisador").addEventListener("click", () => {
-        window.open("analisador-viagens.html", "_blank");
+        window.open("https://wandersontargino185.github.io/Analizador-viagens/", "_blank");
     });
     initMap();
     carregarDados();
